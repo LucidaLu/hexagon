@@ -1,0 +1,49 @@
+{
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "xelatex",
+      "tools": [
+        "xelatex"
+      ]
+    },
+    {
+      "name": "xelatex",
+      "tools": [
+        "xelatex"
+      ]
+    },
+    {
+      "name": "lualatex",
+      "tools": [
+        "lualatex"
+      ]
+    },
+    {
+      "name": "lbll",
+      "tools": [
+        "lualatex",
+        "bibtex",
+        "lualatex",
+        "lualatex"
+      ]
+    },
+    {
+      "name": "pbpp",
+      "tools": [
+        "pdflatex",
+        "bibtex",
+        "pdflatex",
+        "pdflatex"
+      ]
+    },
+    {
+      "name": "xbxx",
+      "tools": [
+        "xelatex",
+        "bibtex",
+        "xelatex",
+        "xelatex"
+      ]
+    }
+  ],
+}
