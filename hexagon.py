@@ -158,6 +158,13 @@ def build_contest(fn):
         f.write(content)
 
 
+def get_std_solution():
+    for f in os.listdir("solutions"):
+        if f.startswith("100"):
+            return f
+    assert 0
+
+
 def generate_sample_output(fn=None):
     if fn is not None:
         os.chdir(fn)
@@ -171,12 +178,9 @@ def generate_sample_output(fn=None):
         ),
     )
 
-    for f in Path("solutions").iterdir():
-        f = str(f)
-        if f.startswith("solutions/100"):
-            print(color("Selected std solution:", "green"), color(f, "blue"))
-            os.system(f"g++ {f} -std=c++17 -o tmp/exec")
-            break
+    std = get_std_solution()
+    print(color("Selected std solution:", "green"), color(std, "blue"))
+    os.system(f"g++ solutions/{std} -w -O2 -std=c++17 -o tmp/exec")
 
     with open("9-samples-note.tex", "r") as f:
         sample_notes = {}
@@ -273,6 +277,22 @@ def generate_sample_output(fn=None):
     shutil.rmtree("tmp")
 
 
+import subprocess
+import resource, psutil, time
+from multiprocessing import Process, Queue
+
+
+def run_program(timeout, q):
+    os.chdir("tmp")
+    p = subprocess.Popen(["timeout", f"{timeout}s", "./exec"])
+    p.wait()
+    ro = resource.getrusage(resource.RUSAGE_CHILDREN)
+    q.put((ro.ru_maxrss, ro.ru_utime))
+
+
+from tqdm import tqdm
+
+
 def validate(fn):
     if fn is not None:
         os.chdir(fn)
@@ -286,33 +306,137 @@ def validate(fn):
         else:
             return (1, int(x))
 
-    sys.path.append(str(Path.home() / ".hexagon"))
-    import _judger
-
     testcases.sort(key=sort_key)
-    for sol in os.listdir("solutions"):
-        os.system(f"g++ solutions/{sol} -std=c++14 -o tmp/exec -O2")
-        for t in testcases:
-            job = _judger.run(
-                max_cpu_time=1000,
-                max_real_time=2000,
-                max_memory=128 * 1024 * 1024,
-                max_process_number=200,
-                max_output_size=10000,
-                max_stack=32 * 1024 * 1024,
-                # five args above can be _judger.UNLIMITED
-                exe_path="tmp/exec",
-                input_path=f"testcases/{t}",
-                output_path=f"tmp/{t}.out",
-                error_path="/dev/null",
-                args=[],
-                env=[],
-                log_path="",
-                seccomp_rule_name="c_cpp",
-                uid=0,
-                gid=0,
+
+    max_tc_name = max(len(tc) for tc in testcases)
+
+    print(color("Building validator", "green"))
+    subprocess.run(
+        [
+            "g++",
+            f"testlib/validator.cpp",
+            "-w",
+            "-std=c++17",
+            "-o",
+            "tmp/validator",
+            "-O2",
+            "-I" + str(Path.home() / ".hexagon/assets"),
+        ]
+    )
+    print(color("Validating testcases", "green"))
+    for tc in testcases:
+        print(tc.rjust(max_tc_name, " "), end=" ")
+        code = subprocess.run(
+            [str(Path.cwd() / "tmp/validator")],
+            stdin=open(f"testcases/{tc}", "r"),
+        ).returncode
+        assert code == 0
+        print(color("passed", "green"))
+    
+    print()
+
+    def execute(timelimit):
+        q = Queue()
+        p = Process(target=run_program, args=(timelimit, q))
+        p.start()
+        p.join()
+        return q.get()
+
+    datas = []
+
+    std = get_std_solution()
+    print(color("Selected std solution:", "green"), color(std, "blue"))
+    os.system(f"g++ solutions/{std} -w -O2 -std=c++17 -o tmp/exec")
+    print(color("Generating std answer", "green"))
+    Path("ans").mkdir(exist_ok=True)
+
+    data = [color(std, "blue"), 100]
+    for j, t in tqdm(enumerate(testcases), total=len(testcases)):
+        shutil.copy(f"testcases/{t}", f"tmp/{fn}.in")
+        mem, time = execute(5)
+        shutil.copy(f"tmp/{fn}.out", f"ans/{t}.out")
+        data.append(
+            color(
+                "%.3fs(%.0fmb)" % (time, int(mem / 1024)),
+                "green",
             )
-            print(job)
+        )
+    datas.append(data)
+
+    import pandas as pd
+
+    print()
+    timelimit = int(open("3-TIME-LIMIT", "r").read().strip())
+    print(color("Time limit:", "green"), color(str(timelimit) + "s", "blue"))
+    print(color("Building checker", "green"))
+    subprocess.run(
+        [
+            "g++",
+            f"testlib/checker.cpp",
+            "-w",
+            "-std=c++17",
+            "-o",
+            "tmp/checker",
+            "-O2",
+            "-I" + str(Path.home() / ".hexagon/assets"),
+        ]
+    )
+
+    print(color("Validating solutions", "green"))
+
+    print()
+
+    remains = list(filter(lambda x: x != std, os.listdir("solutions")))
+    for i, sol in enumerate(remains):
+        subprocess.run(
+            ["g++", f"solutions/{sol}", "-w", "-std=c++17", "-o", "tmp/exec", "-O2"]
+        )
+        print(
+            color(
+                "Running solution %d out of %d:" % (i + 1, len(remains)),
+                "green",
+            ),
+            color(sol, "blue"),
+        )
+        data = [sol, 0]
+        cnt = 0
+        for j, t in enumerate(
+            testcases
+        ):  # tqdm(enumerate(testcases), total=len(testcases)):
+            shutil.copy(f"testcases/{t}", f"tmp/{fn}.in")
+            print(t.rjust(max_tc_name, " "), end=" ")
+            mem, time = execute(5)
+            if os.path.exists(f"tmp/{fn}.out"):
+                code = subprocess.run(
+                    [
+                        str(Path.cwd() / "tmp/checker"),
+                        str(Path.cwd() / "tmp/{fn}.in"),
+                        str(Path.cwd() / f"tmp/{fn}.out"),
+                        str(Path.cwd() / f"ans/{t}.out"),
+                        # str(Path.cwd() / "tmp/report"),
+                    ]
+                ).returncode
+                os.remove(f"tmp/{fn}.out")
+            else:
+                time = timelimit
+
+            ok = code == 0
+            cnt += ok
+            data.append(
+                color(
+                    "%.3fs(%.0fmb)" % (time, int(mem / 1024)),
+                    "green" if ok else "red",
+                )
+            )
+        data[1] = int(100 / len(testcases) * cnt)
+        datas.append(data)
+
+        print()
+
+    df = pd.DataFrame(datas, columns=["solution", "score"] + testcases)
+
+    print(color("Summary", "green"))
+    print(df.to_markdown(index=False))
 
     shutil.rmtree("tmp")
 
@@ -320,18 +444,18 @@ def validate(fn):
 if __name__ == "__main__":
     import sys
 
+    UA = "Usage: hexagon.py [create|build|validate]"
     if len(sys.argv) == 1:
-        print("Usage: hexagon.py [create-problem|build-contest|generate-sample-output]")
+        print(UA)
     else:
-        if sys.argv[1] == "create-problem":
+        if sys.argv[1] == "create":
             create_problem(sys.argv[2])
-        elif sys.argv[1] == "build-contest":
-            build_contest(sys.argv[2])
-        elif sys.argv[1] == "build-problem":
-            generate_sample_output(sys.argv[2])
+        elif sys.argv[1] == "build":
+            if Path(sys.argv[2]).is_dir():
+                generate_sample_output(sys.argv[2])
+            else:
+                build_contest(sys.argv[2])
         elif sys.argv[1] == "validate":
             validate(sys.argv[2])
         else:
-            print(
-                "Usage: hexagon.py [create-problem|build-contest|generate-sample-output]"
-            )
+            print(UA)

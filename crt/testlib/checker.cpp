@@ -2,7 +2,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
-
+// lcmp.cpp
 using namespace std;
 
 bool compareWords(string a, string b) {

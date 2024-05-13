@@ -9,6 +9,9 @@ long long Mul(long long a, long long b, const long long M) {
 }
 
 int main() {
+  freopen("crt.in", "r", stdin);
+  freopen("crt.out", "w", stdout);
+  
   std::ios::sync_with_stdio(0);
   std::cin.tie(0);
   std::cout.tie(0);
