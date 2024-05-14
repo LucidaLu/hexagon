@@ -2,3 +2,5 @@ __pycache__
 *.synctex.gz
 *.aux
 _minted-*
+/build
+/hexagon.egg-info

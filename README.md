@@ -1,12 +1,10 @@
 > 一个对codeforces polygon的拙劣模仿
 
 # 安装
-1. 
+
 ```
-pip install -r requirements.txt
+pip install .
 ```
-2. 
-将`.hexagon`放在`~`中
 
 # 使用
 ```

@@ -532,9 +532,11 @@ def validate_contest(fn):
             if i != len(data_dict["problems"]) - 1:
                 f.write("\n\n")
 
+
 # def export():
 
-if __name__ == "__main__":
+
+def main():
     UA = """Usage: hexagon.py [create|build|validate]
 create:     'create problem-name' to create a new problem
 build:      'build contest-name' to build a contest statement
@@ -565,3 +567,7 @@ validate:   same as build, but doing validations instead
                     validate_contest(sys.argv[2])
         else:
             print(UA)
+
+
+if __name__ == "__main__":
+    main()
