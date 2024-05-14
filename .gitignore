@@ -1,0 +1,4 @@
+__pycache__
+*.synctex.gz
+*.aux
+_minted-*
