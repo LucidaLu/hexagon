@@ -54,7 +54,7 @@ def build_contest(fn):
 
     probs = []
 
-    with open(f"{fn}.yaml", "r") as stream:
+    with open(f"{fn}", "r") as stream:
         data_dict = yaml.safe_load(stream)
 
     for pname in data_dict["problems"]:
@@ -509,7 +509,7 @@ def validate(fn=None):
 
 
 def validate_contest(fn):
-    with open(f"{fn}.yaml", "r") as stream:
+    with open(f"{fn}", "r") as stream:
         data_dict = yaml.safe_load(stream)
     curdir = os.getcwd()
     print(
