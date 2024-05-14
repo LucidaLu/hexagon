@@ -171,6 +171,8 @@ def get_std_solution():
 def generate_sample_output(fn=None):
     if fn is not None:
         os.chdir(fn)
+    else:
+        fn = Path.cwd().name
 
     if not Path("1-CN-NAME").exists():
         print(color("Problem not found", "red"))
@@ -198,18 +200,20 @@ def generate_sample_output(fn=None):
             sample_notes[int(lines[0])] = "\n".join(lines[1:])
 
     samples = []
-    for root, dirs, files in os.walk("testcases"):
-        for f in files:
-            if f.startswith("sample"):
-                os.system(f"tmp/exec < testcases/{f} > tmp/{f}.ans")
-                with open(f"testcases/{f}", "r") as file:
-                    input = file.read()
-                with open(f"tmp/{f}.ans", "r") as file:
-                    output = file.read()
-                no = int(f.replace("sample", ""))
-                if no not in sample_notes:
-                    sample_notes[no] = ""
-                samples.append((input, output, sample_notes[no]))
+    for f in os.listdir("testcases"):
+        if f.startswith("sample"):
+            shutil.copy(f"testcases/{f}", f"tmp/{fn}.in")
+
+            run_program(1000, Queue())
+
+            with open(f"testcases/{f}", "r") as file:
+                input = file.read()
+            with open(f"tmp/{fn}.out", "r") as file:
+                output = file.read()
+            no = int(f.replace("sample", ""))
+            if no not in sample_notes:
+                sample_notes[no] = ""
+            samples.append((input, output, sample_notes[no]))
 
     cnt = [0, 0]
     with open("generated-samples.tex", "w") as f:
@@ -279,7 +283,6 @@ def generate_sample_output(fn=None):
         color(str(cnt[1]), "blue"),
         color("big sample(s)", "green"),
     )
-    import shutil
 
     shutil.rmtree("tmp")
 
@@ -290,6 +293,7 @@ def run_program(timeout, q):
     p.wait()
     ro = resource.getrusage(resource.RUSAGE_CHILDREN)
     q.put((ro.ru_maxrss, ro.ru_utime))
+    os.chdir("..")
 
 
 def dos2unix(fn):
