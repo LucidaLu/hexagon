@@ -8,7 +8,7 @@ pip install .
 
 # 使用
 ```
-hexagon.py [create|build|validate]
+hexagon [create|build|validate]
 create:     'create problem-name' to create a new problem
 build:      'build contest-name' to build a contest statement
             'build problem-name' to build a problem statement
