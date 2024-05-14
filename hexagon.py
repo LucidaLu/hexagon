@@ -1,6 +1,11 @@
 from pathlib import Path
 import shutil
 import os, sys
+import subprocess
+import resource, psutil, time
+from multiprocessing import Process, Queue
+from tqdm import tqdm
+import yaml
 
 
 def color(text, color):
@@ -48,8 +53,6 @@ def build_contest(fn):
     ]
 
     probs = []
-    # read yaml
-    import yaml
 
     with open(f"{fn}.yaml", "r") as stream:
         data_dict = yaml.safe_load(stream)
@@ -169,6 +172,10 @@ def generate_sample_output(fn=None):
     if fn is not None:
         os.chdir(fn)
 
+    if not Path("1-CN-NAME").exists():
+        print(color("Problem not found", "red"))
+        return
+
     Path("tmp").mkdir(exist_ok=True)
     print(
         color("Working on problem", "green"),
@@ -180,7 +187,7 @@ def generate_sample_output(fn=None):
 
     std = get_std_solution()
     print(color("Selected std solution:", "green"), color(std, "blue"))
-    os.system(f"g++ solutions/{std} -w -O2 -std=c++17 -o tmp/exec")
+    compile_cpp(f"solutions/{std}", "tmp/exec")
 
     with open("9-samples-note.tex", "r") as f:
         sample_notes = {}
@@ -277,11 +284,6 @@ def generate_sample_output(fn=None):
     shutil.rmtree("tmp")
 
 
-import subprocess
-import resource, psutil, time
-from multiprocessing import Process, Queue
-
-
 def run_program(timeout, q):
     os.chdir("tmp")
     p = subprocess.Popen(["timeout", f"{timeout}s", "./exec"])
@@ -290,14 +292,14 @@ def run_program(timeout, q):
     q.put((ro.ru_maxrss, ro.ru_utime))
 
 
-from tqdm import tqdm
+def dos2unix(fn):
+    with open(fn, "r") as f:
+        content = f.read()
+    with open(fn, "w") as f:
+        f.write(content.replace("\r\n", "\n"))
 
 
-def validate(fn):
-    if fn is not None:
-        os.chdir(fn)
-
-    Path("tmp").mkdir(exist_ok=True)
+def get_testcases():
     testcases = list(os.listdir("testcases"))
 
     def sort_key(x):
@@ -308,21 +310,45 @@ def validate(fn):
 
     testcases.sort(key=sort_key)
 
-    max_tc_name = max(len(tc) for tc in testcases)
+    return testcases
 
-    print(color("Building validator", "green"))
+
+def compile_cpp(src, dest):
     subprocess.run(
         [
             "g++",
-            f"testlib/validator.cpp",
+            src,
             "-w",
             "-std=c++17",
             "-o",
-            "tmp/validator",
+            dest,
             "-O2",
             "-I" + str(Path.home() / ".hexagon/assets"),
         ]
     )
+
+
+def validate(fn=None):
+    if fn is not None:
+        os.chdir(fn)
+    else:
+        fn = Path.cwd().name
+
+    if not Path("1-CN-NAME").exists():
+        print(color("Problem not found", "red"))
+        return
+
+    if Path("ans").exists():
+        shutil.rmtree("ans")
+    Path("ans").mkdir()
+    Path("tmp").mkdir(exist_ok=True)
+
+    testcases = get_testcases()
+    max_tc_name = max(len(tc) for tc in testcases)
+    # convert to LF
+    print(color("Building validator", "green"))
+    compile_cpp("testlib/validator.cpp", "tmp/validator")
+
     print(color("Validating testcases", "green"))
     for tc in testcases:
         print(tc.rjust(max_tc_name, " "), end=" ")
@@ -332,7 +358,7 @@ def validate(fn):
         ).returncode
         assert code == 0
         print(color("passed", "green"))
-    
+
     print()
 
     def execute(timelimit):
@@ -346,19 +372,20 @@ def validate(fn):
 
     std = get_std_solution()
     print(color("Selected std solution:", "green"), color(std, "blue"))
-    os.system(f"g++ solutions/{std} -w -O2 -std=c++17 -o tmp/exec")
+    compile_cpp(f"solutions/{std}", "tmp/exec")
+
     print(color("Generating std answer", "green"))
     Path("ans").mkdir(exist_ok=True)
 
-    data = [color(std, "blue"), 100]
+    data = [('"' + std + '"', "std"), 100]
     for j, t in tqdm(enumerate(testcases), total=len(testcases)):
         shutil.copy(f"testcases/{t}", f"tmp/{fn}.in")
         mem, time = execute(5)
         shutil.copy(f"tmp/{fn}.out", f"ans/{t}.out")
         data.append(
-            color(
+            (
                 "%.3fs(%.0fmb)" % (time, int(mem / 1024)),
-                "green",
+                "ok",
             )
         )
     datas.append(data)
@@ -369,18 +396,7 @@ def validate(fn):
     timelimit = int(open("3-TIME-LIMIT", "r").read().strip())
     print(color("Time limit:", "green"), color(str(timelimit) + "s", "blue"))
     print(color("Building checker", "green"))
-    subprocess.run(
-        [
-            "g++",
-            f"testlib/checker.cpp",
-            "-w",
-            "-std=c++17",
-            "-o",
-            "tmp/checker",
-            "-O2",
-            "-I" + str(Path.home() / ".hexagon/assets"),
-        ]
-    )
+    compile_cpp("testlib/checker.cpp", "tmp/checker")
 
     print(color("Validating solutions", "green"))
 
@@ -388,9 +404,7 @@ def validate(fn):
 
     remains = list(filter(lambda x: x != std, os.listdir("solutions")))
     for i, sol in enumerate(remains):
-        subprocess.run(
-            ["g++", f"solutions/{sol}", "-w", "-std=c++17", "-o", "tmp/exec", "-O2"]
-        )
+        compile_cpp(f"solutions/{sol}", "tmp/exec")
         print(
             color(
                 "Running solution %d out of %d:" % (i + 1, len(remains)),
@@ -398,7 +412,7 @@ def validate(fn):
             ),
             color(sol, "blue"),
         )
-        data = [sol, 0]
+        data = [('"' + sol + '"', ""), 0]
         cnt = 0
         for j, t in enumerate(
             testcases
@@ -423,9 +437,9 @@ def validate(fn):
             ok = code == 0
             cnt += ok
             data.append(
-                color(
+                (
                     "%.3fs(%.0fmb)" % (time, int(mem / 1024)),
-                    "green" if ok else "red",
+                    "ok" if ok else "fail",  # "green" if ok else "red",
                 )
             )
         data[1] = int(100 / len(testcases) * cnt)
@@ -433,29 +447,121 @@ def validate(fn):
 
         print()
 
-    df = pd.DataFrame(datas, columns=["solution", "score"] + testcases)
+    def fmt1(x):
+        if type(x) == tuple:
+            if x[1] == "":
+                return x[0]
+            else:
+                cmap = {"ok": "green", "fail": "red", "std": "blue"}
+                return color(x[0], cmap[x[1]])
+        else:
+            return x
+
+    def fmt2(x):
+        if type(x) == tuple:
+            if x[1] == "":
+                return x[0]
+            else:
+                return x[1] + " " + x[0]
+        else:
+            return x
 
     print(color("Summary", "green"))
-    print(df.to_markdown(index=False))
+    print(
+        pd.DataFrame(
+            [[fmt1(x) for x in d] for d in datas],
+            columns=["solution", "score"] + testcases,
+        ).to_markdown(index=False)
+    )
+
+    with open("validation report.md", "w") as f:
+        f.write("# Validation Report\n\n")
+        from datetime import datetime as dt
+
+        f.write(dt.now().strftime("%Y-%m-%d %H:%M:%S") + "\n\n")
+        f.write(
+            pd.DataFrame(
+                [
+                    [
+                        fn,
+                        str(timelimit) + "s",
+                        open("4-MEMORY-LIMIT", "r").read().strip() + " MiB",
+                        len(
+                            list(
+                                filter(lambda x: not x.startswith("sample"), testcases)
+                            )
+                        ),
+                    ]
+                ],
+                columns=["problem", "time limit", "memory limit", "testcases"],
+            ).to_markdown(index=False)
+            + "\n\n"
+        )
+
+        f.write(
+            pd.DataFrame(
+                [[fmt2(x) for x in d] for d in datas],
+                columns=["solution", "score"] + testcases,
+            ).to_markdown(index=False)
+        )
 
     shutil.rmtree("tmp")
 
 
-if __name__ == "__main__":
-    import sys
+def validate_contest(fn):
+    with open(f"{fn}.yaml", "r") as stream:
+        data_dict = yaml.safe_load(stream)
+    curdir = os.getcwd()
+    print(
+        color("Validating contest:", "green"), color(data_dict["title"], "blue") + "\n"
+    )
 
-    UA = "Usage: hexagon.py [create|build|validate]"
+    with open(curdir + "/" + "validation report.md", "w") as f:
+        f.write("# Validation Report\n\n")
+        for i, pname in enumerate(data_dict["problems"]):
+            os.chdir(curdir + "/" + pname)
+            print(color("Validating problem:", "green"), color(pname, "blue"))
+            validate()
+            f.write(
+                f"## {pname}\n\n"
+                + open(curdir + "/" + pname + "/validation report.md", "r")
+                .read()
+                .replace("# Validation Report\n\n", "")
+                + "\n\n"
+            )
+            if i != len(data_dict["problems"]) - 1:
+                f.write("\n\n")
+
+# def export():
+
+if __name__ == "__main__":
+    UA = """Usage: hexagon.py [create|build|validate]
+create:     'create problem-name' to create a new problem
+build:      'build contest-name' to build a contest statement
+            'build problem-name' to build a problem statement
+            if no argument is given, then build the statement for the problem in the current directory
+validate:   same as build, but doing validations instead
+"""
     if len(sys.argv) == 1:
         print(UA)
     else:
         if sys.argv[1] == "create":
             create_problem(sys.argv[2])
         elif sys.argv[1] == "build":
-            if Path(sys.argv[2]).is_dir():
-                generate_sample_output(sys.argv[2])
+            if len(sys.argv) < 3:
+                generate_sample_output()
             else:
-                build_contest(sys.argv[2])
+                if Path(sys.argv[2]).is_dir():
+                    generate_sample_output(sys.argv[2])
+                else:
+                    build_contest(sys.argv[2])
         elif sys.argv[1] == "validate":
-            validate(sys.argv[2])
+            if len(sys.argv) < 3:
+                validate()
+            else:
+                if Path(sys.argv[2]).is_dir():
+                    validate(sys.argv[2])
+                else:
+                    validate_contest(sys.argv[2])
         else:
             print(UA)
