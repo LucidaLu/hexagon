@@ -8,12 +8,12 @@ pip install .
 
 # 使用
 ```
-hexagon.py [create|build|validate]
+hexagon [create|build|validate]
 create:     'create problem-name' to create a new problem
 build:      'build contest-name' to build a contest statement
             'build problem-name' to build a problem statement
             if no argument is given, then build the statement for the problem in the current directory
-validate:   same as build, but doing validations instead```
+validate:   same as build, but doing validations instead
 ```
 
 ## create
