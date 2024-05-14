@@ -1,0 +1,63 @@
+\documentclass{\string~/.hexagon/assets/statement}
+
+\title{{{title}}}
+
+\fancyhead[R]{\footnotesize \MakeLowercase{\fancyplain{}{\leftmark}}}
+\renewcommand{\sectionmark}[1]{\markboth{#1}{}} 
+
+
+\begin{document}
+\begin{titlepage}
+  \vspace*{-20mm}
+  \begin{center}
+    \LARGE \sffamily \thetitle \\
+    {{subtitle}}\\
+    % \LARGE {\rmfamily Div 1}
+    % \includegraphics[height = 32 pt]{11.png} 特供版
+    % \par\mdseries\LARGE\SubtitleContent\vskip 0.5em
+
+    \large \rmfamily 时间：{{date}} {{start}} \textasciitilde\ {{end}}
+    \vskip 0.5em
+  \end{center}
+
+  \begin{center}
+    {{meta}}
+  \end{center}
+
+  提交源程序文件名
+  \begin{center}
+    {{fns}}
+  \end{center}
+
+  编译选项
+  \begin{center}
+    \begin{tabularx}{\textwidth}{|p{3.2cm}|X|X|X|}
+      \hline
+      对于 C++ & \multicolumn{3}{>{\centering\hsize=\dimexpr3\hsize+4\tabcolsep+2\arrayrulewidth\relax}X|}{\texttt{-O2 -std=c++14 -static}} \\
+      \hline
+    \end{tabularx}\par
+  \end{center}
+
+  \begingroup\titleformat{\subsection}{\bf}{}{0pt}{\hspace{0.5em}}\subsection{注意事项与提醒（请选手务必仔细阅读）}\endgroup
+  \begin{enumerate}
+    \item 选手提交的源程序必须存放在\stress{已建立}好的，且\stress{带有样例文件和下发文件的}的文件夹中，文件名称与对应试题英文名一致；
+    \item 文件名（包括程序名和输入输出文件名）必须使用英文小写。
+    \item C++ 中函数 main() 的返回值类型必须是 int，值必须为 0。
+    \item \stress{对于因未遵守以上规则对成绩造成的影响，相关申诉不予受理}。
+    \item 若无特殊说明，结果比较方式为\stress{忽略行末空格、文末回车后的全文比较。}。
+    \item 程序可使用的栈空间大小与该题内存空间限制一致。
+    \item 在终端中执行命令 \texttt{ulimit -s unlimited} 可将当前终端下的栈空间限制放大，但你使用的栈空间大小不应超过题目限制。
+    \item 若无特殊说明，每道题的\stress{代码大小限制为 100KB}。
+    \item 若无特殊说明，输入与输出中同一行的相邻整数、字符串等均使用一个空格分隔。
+    \item 输入文件中可能存在行末空格，请选手使用更完善的读入方式（例如 scanf 函数）避免出错。
+    \item 直接复制 PDF 题面中的多行样例，数据将带有行号，建议选手直接使用对应目录下的样例文件进行测试。
+    \item 使用 std::deque 等 STL 容器时，请注意其内存空间消耗。
+    \item 请务必使用题面中规定的的编译参数，保证你的程序在本机能够通过编译。此外\stress{不允许在程序中手动开启其他编译选项}，一经发现，本题成绩以 0 分处理。
+  \end{enumerate}
+\end{titlepage}
+
+\clearpage
+
+{{prob-statements}}
+
+\end{document}
