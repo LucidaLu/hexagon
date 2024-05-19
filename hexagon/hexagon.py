@@ -129,13 +129,15 @@ def build_contest(fn):
 
     for p in data_dict["problems"]:
         s += "%% problem statement for %s\n" % (p)
+        cn_name = open(p + "/1-CN-NAME").read()
+        full_name = f"{cn_name}（{p}）"
         PROBLEM_TEMPLATE = (
             r"""
 \renewcommand{\cnname}{\protect\input{1-CN-NAME}\unskip}
 \renewcommand{\enname}{\protect\input{2-EN-NAME}\unskip}
 
 \section["""
-            + p
+            + full_name
             + r"""]{\cnname（\englishname{\enname}）}
 
 \subsection[题目描述]{【题目描述】}
@@ -581,20 +583,32 @@ def export_problem(fn=None):
 
     print(color("Compiling statement", "green"))
 
+    with open("statement.tex", "r") as f:
+        content = (
+            f.read()
+            .replace("\\cnname", open("1-CN-NAME", "r").read())
+            .replace("\\enname", fn)
+        )
+
+    with open("statement-escape.tex", "w") as f:
+        f.write(content)
+
     subprocess.run(
-        ["xelatex", "-shell-escape", "statement.tex"],
+        ["xelatex", "-shell-escape", "statement-escape.tex"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     subprocess.run(
-        ["xelatex", "-shell-escape", "statement.tex"],
+        ["xelatex", "-shell-escape", "statement-escape.tex"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
 
     print(color("Copying files", "green"))
 
-    shutil.copy("statement.pdf", f"tmp/{fn}.pdf")
+    shutil.copy("statement-escape.pdf", f"tmp/{fn}.pdf")
+
+    os.system("rm statement-escape.*")
 
     for f in os.listdir("testcases"):
         if f.startswith("sample"):
