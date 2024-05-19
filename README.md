@@ -22,7 +22,7 @@ validate:   same as build, but doing validations instead
 
 其中，
 * testcases里面需要以`1`,`2`,`3`...以及`sample1`,`sample2`...的形式命名，存储输入文件。无需手动创建输出文件，会自动生成
-* solutions里面存储各种程序，推荐以程序的期望得分来命名。其中必须要有一个名为`100.cpp`的标程。
+* solutions里面存储各种程序。其中必须要有一个名为`std.cpp`的标程。
 * testlib里面存储validator和checker，详见[这里](https://github.com/MikeMirzayanov/testlib/tree/master)。一般来说，checker不需要手动修改，validator需要根据题目的输入格式来修改。
 
 ## build

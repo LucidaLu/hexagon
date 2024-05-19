@@ -129,11 +129,14 @@ def build_contest(fn):
 
     for p in data_dict["problems"]:
         s += "%% problem statement for %s\n" % (p)
-        PROBLEM_TEMPLATE = r"""
+        PROBLEM_TEMPLATE = (
+            r"""
 \renewcommand{\cnname}{\protect\input{1-CN-NAME}\unskip}
 \renewcommand{\enname}{\protect\input{2-EN-NAME}\unskip}
 
-\section{\cnname（\englishname{\enname}）}
+\section["""
+            + p
+            + r"""]{\cnname（\englishname{\enname}）}
 
 \subsection[题目描述]{【题目描述】}
 \input{5-legend}
@@ -150,6 +153,7 @@ def build_contest(fn):
 \clearpage
 
 """
+        )
         s += PROBLEM_TEMPLATE.replace(r"\input{", "\\input{%s/" % (p))
 
     data_dict["prob-statements"] = s
@@ -163,7 +167,7 @@ def build_contest(fn):
 
 def get_std_solution():
     for f in os.listdir("solutions"):
-        if f.startswith("100"):
+        if f.startswith("std"):
             return f
     assert 0
 
@@ -223,7 +227,7 @@ def generate_sample_output(fn=None):
             input, output, note = s
 
             # print(len(input) + len(output))
-            if len(input) + len(output) < 50:
+            if len(input) + len(output) < 200:
                 cnt[0] += 1
                 if input.endswith("\n"):
                     input = input[:-1]
@@ -323,7 +327,7 @@ def compile_cpp(src, dest):
             "g++",
             src,
             "-w",
-            "-std=c++17",
+            "-std=c++14",
             "-o",
             dest,
             "-O2",
@@ -384,7 +388,7 @@ def validate(fn=None):
     data = [('"' + std + '"', "std"), 100]
     for j, t in tqdm(enumerate(testcases), total=len(testcases)):
         shutil.copy(f"testcases/{t}", f"tmp/{fn}.in")
-        mem, time = execute(5)
+        mem, time = execute(1000)
         shutil.copy(f"tmp/{fn}.out", f"ans/{t}.out")
         data.append(
             (
@@ -407,6 +411,7 @@ def validate(fn=None):
     print()
 
     remains = list(filter(lambda x: x != std, os.listdir("solutions")))
+    time_limit = int(open("3-TIME-LIMIT", "r").read().strip())
     for i, sol in enumerate(remains):
         compile_cpp(f"solutions/{sol}", "tmp/exec")
         print(
@@ -423,7 +428,7 @@ def validate(fn=None):
         ):  # tqdm(enumerate(testcases), total=len(testcases)):
             shutil.copy(f"testcases/{t}", f"tmp/{fn}.in")
             print(t.rjust(max_tc_name, " "), end=" ")
-            mem, time = execute(5)
+            mem, time = execute(time_limit)
             if os.path.exists(f"tmp/{fn}.out"):
                 code = subprocess.run(
                     [
@@ -439,14 +444,20 @@ def validate(fn=None):
                 time = timelimit
 
             ok = code == 0
-            cnt += ok
+            if not t.startswith("sample"):
+                cnt += ok
+
             data.append(
                 (
                     "%.3fs(%.0fmb)" % (time, int(mem / 1024)),
                     "ok" if ok else "fail",  # "green" if ok else "red",
                 )
             )
-        data[1] = int(100 / len(testcases) * cnt)
+        data[1] = int(
+            100
+            / len(list(filter(lambda x: not x.startswith("sample"), testcases)))
+            * cnt
+        )
         datas.append(data)
 
         print()
@@ -471,11 +482,22 @@ def validate(fn=None):
             return x
 
     print(color("Summary", "green"))
+
+    def transpose_markdown(df):
+        df = df.transpose()
+        df.columns = ["" for i in range(len(df.columns))]
+        # df.index = ["{}".format(idx) for idx in df.index]
+        l = df.to_markdown(tablefmt="grid").split("\n")[2:]
+        l[0], l[2] = l[2], l[0]
+        return "\n".join(l)
+
     print(
-        pd.DataFrame(
-            [[fmt1(x) for x in d] for d in datas],
-            columns=["solution", "score"] + testcases,
-        ).to_markdown(index=False)
+        transpose_markdown(
+            pd.DataFrame(
+                [[fmt1(x) for x in d] for d in datas],
+                columns=["solution", "score"] + testcases,
+            )
+        )
     )
 
     with open("validation report.md", "w") as f:
@@ -498,15 +520,19 @@ def validate(fn=None):
                     ]
                 ],
                 columns=["problem", "time limit", "memory limit", "testcases"],
-            ).to_markdown(index=False)
+            )
+            # .transpose()
+            .to_markdown(index=False)
             + "\n\n"
         )
 
         f.write(
-            pd.DataFrame(
-                [[fmt2(x) for x in d] for d in datas],
-                columns=["solution", "score"] + testcases,
-            ).to_markdown(index=False)
+            transpose_markdown(
+                pd.DataFrame(
+                    [[fmt2(x) for x in d] for d in datas],
+                    columns=["solution", "score"] + testcases,
+                )
+            )
         )
 
     shutil.rmtree("tmp")
@@ -537,7 +563,214 @@ def validate_contest(fn):
                 f.write("\n\n")
 
 
-# def export():
+def export_problem(fn=None):
+    if fn is not None:
+        os.chdir(fn)
+    else:
+        fn = Path.cwd().name
+
+    if not Path("1-CN-NAME").exists():
+        print(color("Problem not found", "red"))
+        return
+
+    print(color("Exporting problem", "green"), color(fn, "blue"))
+
+    if Path("tmp").exists():
+        shutil.rmtree("tmp")
+    Path("tmp").mkdir()
+
+    print(color("Compiling statement", "green"))
+
+    subprocess.run(
+        ["xelatex", "-shell-escape", "statement.tex"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["xelatex", "-shell-escape", "statement.tex"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    print(color("Copying files", "green"))
+
+    shutil.copy("statement.pdf", f"tmp/{fn}.pdf")
+
+    for f in os.listdir("testcases"):
+        if f.startswith("sample"):
+            shutil.copy(f"testcases/{f}", f"tmp/{fn}{f[6:]}.in")
+            shutil.copy(f"ans/{f}.out", f"tmp/{fn}{f[6:]}.ans")
+
+    print(color("Zipping files", "green"))
+    shutil.make_archive(fn, "zip", "tmp")
+
+    print(color("Cleaning up", "green"))
+    shutil.rmtree("tmp")
+
+
+def export_contest(fn):
+    with open(f"{fn}", "r") as stream:
+        data_dict = yaml.safe_load(stream)
+
+    fn = fn.replace(".yaml", "")
+
+    print(color("Exporting contest:", "green"), color(data_dict["title"], "blue"))
+
+    if Path("tmp").exists():
+        shutil.rmtree("tmp")
+    Path("tmp").mkdir()
+
+    print(color("Compiling statement", "green"))
+
+    subprocess.run(
+        ["xelatex", "-shell-escape", "statement-full.tex"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["xelatex", "-shell-escape", "statement-full.tex"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+    shutil.copy("statement-full.pdf", f"tmp/statement.pdf")
+
+    for pname in data_dict["problems"]:
+        Path(f"tmp/{pname}").mkdir()
+        for f in os.listdir(f"{pname}/testcases"):
+            if f.startswith("sample"):
+                shutil.copy(f"{pname}/testcases/{f}", f"tmp/{pname}/{pname}{f[6:]}.in")
+                shutil.copy(f"{pname}/ans/{f}.out", f"tmp/{pname}/{pname}{f[6:]}.ans")
+
+    print(color("Zipping files", "green"))
+    shutil.make_archive(fn, "zip", "tmp")
+
+    print(color("Cleaning up", "green"))
+    shutil.rmtree("tmp")
+
+    print(color("Building lemon package", "green"))
+    Path("tmp").mkdir()
+    Path("tmp/data").mkdir()
+    Path("tmp/source").mkdir()
+
+    empty_lists = [[] for _ in range(len(data_dict["problems"]))]
+    meta = {
+        "contestTitle": fn,
+        "contestants": [
+            {
+                "checkJudged": [False] * len(data_dict["problems"]),
+                "compileMesaage": [""] * len(data_dict["problems"]),
+                "compileState": [1] * len(data_dict["problems"]),
+                "contestantName": "std",
+                "inputFiles": empty_lists,
+                "judgingTime_date": 0,
+                "judgingTime_time": 0,
+                "judgingTime_timespec": 0,
+                "memoryUsed": empty_lists,
+                "message": empty_lists,
+                "result": empty_lists,
+                "score": empty_lists,
+                "sourceFile": [""] * len(data_dict["problems"]),
+                "timeUsed": empty_lists,
+            }
+        ],
+        "tasks": [],
+    }
+
+    Path("tmp/source/std").mkdir()
+    Path("tmp/checker").mkdir()
+
+    for pname in data_dict["problems"]:
+        # copy checker
+        with open(f"{pname}/testlib/checker.cpp", "r") as f:
+            code = f.read()
+        code = code.replace("registerTestlibCmd", "registerLemonChecker")
+        with open(f"tmp/checker/{pname}.cpp", "w") as f:
+            f.write(code)
+
+        # problem metadata
+        problem_meta = {
+            "answerFileExtension": "out",
+            "comparisonMode": 4,
+            "compilerConfiguration": {"g++": "C++14 O2"},
+            "diffArguments": "--ignore-space-change --text --brief",
+            "inputFileName": f"{pname}.in",
+            "outputFileName": f"{pname}.out",
+            "problemTitle": pname,
+            "realPrecision": 4,
+            "sourceFileName": pname,
+            "specialJudge": f"{pname}/checker.exe",
+            "standardInputCheck": False,
+            "standardOutputCheck": False,
+            "subFolderCheck": True,
+            "taskType": 0,
+            "testCases": [],
+        }
+
+        with open(f"{pname}/4-MEMORY-LIMIT", "r") as f:
+            memlimit = int(f.read().strip())
+        with open(f"{pname}/3-TIME-LIMIT", "r") as f:
+            timelimit = int(f.read().strip())
+
+        shutil.copytree(f"{pname}/solutions", f"tmp/source/std/{pname}")
+        shutil.move(
+            f"tmp/source/std/{pname}/std.cpp", f"tmp/source/std/{pname}/{pname}.cpp"
+        )
+
+        Path("tmp/data/" + pname).mkdir()
+
+        # problem testcases
+        testcases = list(
+            filter(
+                lambda x: not x.startswith("sample"),
+                os.listdir(f"{pname}/testcases"),
+            )
+        )
+
+        testcases.sort(key=lambda x: int(x))
+        for f in testcases:
+            shutil.copy(f"{pname}/testcases/{f}", f"tmp/data/{pname}/{f}.in")
+            shutil.copy(f"{pname}/ans/{f}.out", f"tmp/data/{pname}/{f}.ans")
+            problem_meta["testCases"].append(
+                {
+                    "fullScore": 100 / len(testcases),
+                    "inputFiles": [f"{pname}/{f}.in"],
+                    "memoryLimit": memlimit,
+                    "outputFiles": [f"{pname}/{f}.ans"],
+                    "timeLimit": timelimit * 1000,
+                }
+            )
+
+        meta["tasks"].append(problem_meta)
+
+    shutil.copy(
+        str(Path.home() / ".hexagon/assets/testlib-lemon.h"), "tmp/checker/testlib.h"
+    )
+
+    compile_cmd = ""
+    for pname in data_dict["problems"]:
+        compile_cmd += f"g++ checker/{pname}.cpp -std=c++14 -O2 -o checker/{pname}\n"
+        compile_cmd += f"mv checker/{pname}.exe data/{pname}/checker.exe\n"
+
+    with open("tmp/generate_checkers.bat", "w") as f:
+        f.write(compile_cmd)
+    with open("tmp/generate_checkers.sh", "w") as f:
+        f.write(compile_cmd.replace(".exe", ""))
+
+    # create empty file
+    open("tmp/GENERATE CHECKERS FIRST", "w").close()
+
+    shutil.copy("statement-full.pdf", "tmp/statement.pdf")
+
+    with open(f"tmp/{fn}.cdf", "w") as f:
+        import json
+
+        f.write(json.dumps(meta))
+
+    shutil.make_archive("Lemon_package_" + fn, "zip", "tmp")
+
+    print(color("Cleaning up", "green"))
+    shutil.rmtree("tmp")
 
 
 def main():
@@ -547,6 +780,7 @@ build:      'build contest-name' to build a contest statement
             'build problem-name' to build a problem statement
             if no argument is given, then build the statement for the problem in the current directory
 validate:   same as build, but doing validations instead
+export:     same as build, but export problem/contest packages instead
 """
     if len(sys.argv) == 1:
         print(UA)
@@ -569,6 +803,14 @@ validate:   same as build, but doing validations instead
                     validate(sys.argv[2])
                 else:
                     validate_contest(sys.argv[2])
+        elif sys.argv[1] == "export":
+            if len(sys.argv) < 3:
+                export_problem()
+            else:
+                if Path(sys.argv[2]).is_dir():
+                    export_problem(sys.argv[2])
+                else:
+                    export_contest(sys.argv[2])
         else:
             print(UA)
 
