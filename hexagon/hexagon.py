@@ -6,6 +6,7 @@ import resource, psutil, time
 from multiprocessing import Process, Queue
 from tqdm import tqdm
 import yaml
+import markdown
 
 
 def color(text, color):
@@ -81,7 +82,7 @@ def build_contest(fn):
             r"\texttt{%s}" % (c[1]),
             r"\texttt{%s}" % (c[1] + ".in"),
             r"\texttt{%s}" % (c[1] + ".out"),
-            c[2] + "秒",
+            "%.1f" % (float(c[2])) + "秒",
             str(c[3]) + " MiB",
             str(c[4]),
             "是",
@@ -479,7 +480,8 @@ def validate(fn=None):
             if x[1] == "":
                 return x[0]
             else:
-                return x[1] + " " + x[0]
+                cmap = {"ok": "green", "fail": "red", "std": "blue"}
+                return f'<span style="color:{cmap[x[1]]}">{x[0]}</span>'
         else:
             return x
 
@@ -489,8 +491,8 @@ def validate(fn=None):
         df = df.transpose()
         df.columns = ["" for i in range(len(df.columns))]
         # df.index = ["{}".format(idx) for idx in df.index]
-        l = df.to_markdown(tablefmt="grid").split("\n")[2:]
-        l[0], l[2] = l[2], l[0]
+        l = df.to_markdown().split("\n")[1:]
+        l[0], l[1] = l[1], l[0]
         return "\n".join(l)
 
     print(
@@ -503,7 +505,7 @@ def validate(fn=None):
     )
 
     with open("validation report.md", "w") as f:
-        f.write("# Validation Report\n\n")
+        f.write("# validation report\n\n")
         from datetime import datetime as dt
 
         f.write(dt.now().strftime("%Y-%m-%d %H:%M:%S") + "\n\n")
@@ -536,6 +538,11 @@ def validate(fn=None):
                 )
             )
         )
+    markdown.markdownFromFile(
+        input="validation report.md",
+        output="validation report.html",
+        extensions=["tables"],
+    )
 
     shutil.rmtree("tmp")
 
@@ -549,7 +556,7 @@ def validate_contest(fn):
     )
 
     with open(curdir + "/" + "validation report.md", "w") as f:
-        f.write("# Validation Report\n\n")
+        f.write("# validation report\n\n")
         for i, pname in enumerate(data_dict["problems"]):
             os.chdir(curdir + "/" + pname)
             print(color("Validating problem:", "green"), color(pname, "blue"))
@@ -558,11 +565,17 @@ def validate_contest(fn):
                 f"## {pname}\n\n"
                 + open(curdir + "/" + pname + "/validation report.md", "r")
                 .read()
-                .replace("# Validation Report\n\n", "")
+                .replace("# validation report\n\n", "")
                 + "\n\n"
             )
             if i != len(data_dict["problems"]) - 1:
                 f.write("\n\n")
+
+    markdown.markdownFromFile(
+        input=curdir + "/validation report.md",
+        output=curdir + "/validation report.html",
+        extensions=["tables"],
+    )
 
 
 def export_problem(fn=None):
