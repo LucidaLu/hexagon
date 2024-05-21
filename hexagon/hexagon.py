@@ -230,7 +230,7 @@ def generate_sample_output(fn=None):
             input, output, note = s
 
             # print(len(input) + len(output))
-            if len(input) + len(output) < 200:
+            if len(input) + len(output) < 1000:
                 cnt[0] += 1
                 if input.endswith("\n"):
                     input = input[:-1]
@@ -504,7 +504,7 @@ def validate(fn=None):
         )
     )
 
-    with open("validation report.md", "w") as f:
+    with open("validation-report.md", "w") as f:
         f.write("# validation report\n\n")
         from datetime import datetime as dt
 
@@ -539,8 +539,8 @@ def validate(fn=None):
             )
         )
     markdown.markdownFromFile(
-        input="validation report.md",
-        output="validation report.html",
+        input="validation-report.md",
+        output="validation-report.html",
         extensions=["tables"],
     )
 
@@ -555,7 +555,7 @@ def validate_contest(fn):
         color("Validating contest:", "green"), color(data_dict["title"], "blue") + "\n"
     )
 
-    with open(curdir + "/" + "validation report.md", "w") as f:
+    with open(curdir + f"/{fn.replace('.yaml','')}-validation-report.md", "w") as f:
         f.write("# validation report\n\n")
         for i, pname in enumerate(data_dict["problems"]):
             os.chdir(curdir + "/" + pname)
@@ -572,8 +572,8 @@ def validate_contest(fn):
                 f.write("\n\n")
 
     markdown.markdownFromFile(
-        input=curdir + "/validation report.md",
-        output=curdir + "/validation report.html",
+        input=curdir + f"/{fn.replace('.yaml','')}-validation-report.md",
+        output=curdir + f"/{fn.replace('.yaml','')}-validation-report.html",
         extensions=["tables"],
     )
 
