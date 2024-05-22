@@ -145,9 +145,11 @@ def build_contest(fn):
 \input{5-legend}
 \subsection[输入格式]{【输入格式】}
 从文件 \filename{\enname.in} 中读入数据。
+
 \input{6-input-format}
 \subsection[输出格式]{【输出格式】}
-输出到文件 \filename{\enname.in} 中。
+输出到文件 \filename{\enname.out} 中。
+
 \input{7-output-format}
 \input{generated-samples}
 
@@ -164,7 +166,7 @@ def build_contest(fn):
         if type(v) == str:
             content = content.replace("{{%s}}" % (k), v)
 
-    with open("statement-full.tex", "w") as f:
+    with open(f"{fn.replace('.yaml','')}.tex", "w") as f:
         f.write(content)
 
 
@@ -563,7 +565,7 @@ def validate_contest(fn):
             validate()
             f.write(
                 f"## {pname}\n\n"
-                + open(curdir + "/" + pname + "/validation report.md", "r")
+                + open(curdir + "/" + pname + "/validation-report.md", "r")
                 .read()
                 .replace("# validation report\n\n", "")
                 + "\n\n"
@@ -650,17 +652,17 @@ def export_contest(fn):
     print(color("Compiling statement", "green"))
 
     subprocess.run(
-        ["xelatex", "-shell-escape", "statement-full.tex"],
+        ["xelatex", "-shell-escape", f"{fn}.tex"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     subprocess.run(
-        ["xelatex", "-shell-escape", "statement-full.tex"],
+        ["xelatex", "-shell-escape", f"{fn}.tex"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
 
-    shutil.copy("statement-full.pdf", f"tmp/statement.pdf")
+    shutil.copy(f"{fn}.pdf", f"tmp/statement.pdf")
 
     for pname in data_dict["problems"]:
         Path(f"tmp/{pname}").mkdir()
@@ -787,7 +789,7 @@ def export_contest(fn):
     # create empty file
     open("tmp/GENERATE CHECKERS FIRST", "w").close()
 
-    shutil.copy("statement-full.pdf", "tmp/statement.pdf")
+    shutil.copy(f"{fn}.pdf", "tmp/statement.pdf")
 
     with open(f"tmp/{fn}.cdf", "w") as f:
         import json
