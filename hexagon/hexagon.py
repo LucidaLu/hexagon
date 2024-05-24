@@ -59,6 +59,10 @@ def build_contest(fn):
         data_dict = yaml.safe_load(stream)
 
     for pname in data_dict["problems"]:
+        generate_sample_output(pname)
+        os.chdir("..")
+
+    for pname in data_dict["problems"]:
         pname = pname.strip()
 
         c = [
