@@ -2,7 +2,6 @@ from pathlib import Path
 import shutil
 import os, sys
 import subprocess
-import resource, psutil, time
 from multiprocessing import Process, Queue
 from tqdm import tqdm
 import yaml
@@ -35,7 +34,7 @@ def color(text, color):
 def create_problem(name):
     assert not Path(name).exists(), f"Problem {name} already exists"
     shutil.copytree(Path.home() / ".hexagon/template", name)
-    with open(name + "/2-EN-NAME", "w") as f:
+    with open(name + "/2-EN-NAME", "w", encoding="utf-8") as f:
         f.write(name)
 
 
@@ -55,7 +54,7 @@ def build_contest(fn):
 
     probs = []
 
-    with open(f"{fn}", "r") as stream:
+    with open(f"{fn}", "r", encoding="utf-8") as stream:
         data_dict = yaml.safe_load(stream)
 
     for pname in data_dict["problems"]:
@@ -66,10 +65,10 @@ def build_contest(fn):
         pname = pname.strip()
 
         c = [
-            open(f"{pname}/1-CN-NAME", "r").read().strip(),
-            open(f"{pname}/2-EN-NAME", "r").read().strip(),
-            open(f"{pname}/3-TIME-LIMIT", "r").read().strip(),
-            open(f"{pname}/4-MEMORY-LIMIT", "r").read().strip(),
+            open(f"{pname}/1-CN-NAME", "r", encoding="utf-8").read().strip(),
+            open(f"{pname}/2-EN-NAME", "r", encoding="utf-8").read().strip(),
+            open(f"{pname}/3-TIME-LIMIT", "r", encoding="utf-8").read().strip(),
+            open(f"{pname}/4-MEMORY-LIMIT", "r", encoding="utf-8").read().strip(),
             len(
                 list(
                     filter(
@@ -80,7 +79,7 @@ def build_contest(fn):
             ),
         ]
         prob = [
-            open(f"{pname}/1-CN-NAME", "r").read().strip(),
+            open(f"{pname}/1-CN-NAME", "r", encoding="utf-8").read().strip(),
             "传统题",
             r"\texttt{%s}" % (c[1]),
             r"\texttt{%s}" % (c[1]),
@@ -128,7 +127,9 @@ def build_contest(fn):
         )
     )
 
-    with open(Path.home() / ".hexagon" / "statement-full.tex", "r") as f:
+    with open(
+        Path.home() / ".hexagon" / "statement-full.tex", "r", encoding="utf-8"
+    ) as f:
         content = f.read()
     s = ""
 
@@ -170,7 +171,7 @@ def build_contest(fn):
         if type(v) == str:
             content = content.replace("{{%s}}" % (k), v)
 
-    with open(f"{fn.replace('.yaml','')}.tex", "w") as f:
+    with open(f"{fn.replace('.yaml','')}.tex", "w", encoding="utf-8") as f:
         f.write(content)
 
 
@@ -195,7 +196,10 @@ def generate_sample_output(fn=None):
     print(
         color("Working on problem", "green"),
         color(
-            open("1-CN-NAME", "r").read() + " (" + open("2-EN-NAME", "r").read() + ")",
+            open("1-CN-NAME", "r", encoding="utf-8").read()
+            + " ("
+            + open("2-EN-NAME", "r", encoding="utf-8").read()
+            + ")",
             "blue",
         ),
     )
@@ -204,7 +208,7 @@ def generate_sample_output(fn=None):
     print(color("Selected std solution:", "green"), color(std, "blue"))
     compile_cpp(f"solutions/{std}", "tmp/exec")
 
-    with open("9-samples-note.tex", "r") as f:
+    with open("9-samples-note.tex", "r", encoding="utf-8") as f:
         sample_notes = {}
         for n in f.read().split("%%"):
             if not n.strip():
@@ -219,9 +223,9 @@ def generate_sample_output(fn=None):
 
             run_program(1000, Queue())
 
-            with open(f"testcases/{f}", "r") as file:
+            with open(f"testcases/{f}", "r", encoding="utf-8") as file:
                 input = file.read()
-            with open(f"tmp/{fn}.out", "r") as file:
+            with open(f"tmp/{fn}.out", "r", encoding="utf-8") as file:
                 output = file.read()
             no = int(f.replace("sample", ""))
             if no not in sample_notes:
@@ -229,10 +233,12 @@ def generate_sample_output(fn=None):
             samples.append((input, output, sample_notes[no]))
 
     cnt = [0, 0]
-    with open("generated-samples.tex", "w") as f:
-        f.write("%% this file is auto-generated. Do not edit it directly.\n\n")
+    with open("generated-samples.tex", "w", encoding="utf-8") as f:
+        f.write(
+            "%% this file is auto-generated. Edits to this file will be overridden by hexagon build.\n\n"
+        )
         for i, s in enumerate(samples):
-            no = "样例" + ("" if len(samples) == 1 else r" {\rm %s}" % (str(i + 1)))
+            no = "样例" + ("" if len(samples) == 1 else r" {\rm %s} " % (str(i + 1)))
             input, output, note = s
 
             # print(len(input) + len(output))
@@ -250,8 +256,8 @@ def generate_sample_output(fn=None):
 
 %s
 """ % (
-                        no + " 解释",
-                        no + " 解释",
+                        no + "解释",
+                        no + "解释",
                         note,
                     )
                 f.write(
@@ -269,11 +275,11 @@ def generate_sample_output(fn=None):
 %s
 """
                     % (
-                        no + " 输入",
-                        no + " 输入",
+                        no + "输入",
+                        no + "输入",
                         input,
-                        no + " 输出",
-                        no + " 输出",
+                        no + "输出",
+                        no + "输出",
                         output,
                         ifnote,
                     )
@@ -301,18 +307,30 @@ def generate_sample_output(fn=None):
 
 
 def run_program(timeout, q):
-    os.chdir("tmp")
-    p = subprocess.Popen(["timeout", f"{timeout}s", "./exec"])
-    p.wait()
-    ro = resource.getrusage(resource.RUSAGE_CHILDREN)
-    q.put((ro.ru_maxrss, ro.ru_utime))
-    os.chdir("..")
+    # determine if is linux
+    if os.name == "posix":
+        import resource
+
+        os.chdir("tmp")
+        p = subprocess.Popen(["timeout", f"{timeout}s", "./exec"])
+        p.wait()
+        ro = resource.getrusage(resource.RUSAGE_CHILDREN)
+        q.put((ro.ru_maxrss, ro.ru_utime))
+        os.chdir("..")
+    elif os.name == "nt":
+        import time
+
+        os.chdir("tmp")
+        start = time.time()
+        subprocess.check_output("exec", timeout=timeout)
+        q.put((0, time.time() - start))
+        os.chdir("..")
 
 
 def dos2unix(fn):
-    with open(fn, "r") as f:
+    with open(fn, "r", encoding="utf-8") as f:
         content = f.read()
-    with open(fn, "w") as f:
+    with open(fn, "w", encoding="utf-8") as f:
         f.write(content.replace("\r\n", "\n"))
 
 
@@ -371,7 +389,7 @@ def validate(fn=None):
         print(tc.rjust(max_tc_name, " "), end=" ")
         code = subprocess.run(
             [str(Path.cwd() / "tmp/validator")],
-            stdin=open(f"testcases/{tc}", "r"),
+            stdin=open(f"testcases/{tc}", "r", encoding="utf-8"),
         ).returncode
         assert code == 0
         print(color("passed", "green"))
@@ -410,7 +428,7 @@ def validate(fn=None):
     import pandas as pd
 
     print()
-    timelimit = int(open("3-TIME-LIMIT", "r").read().strip())
+    timelimit = int(open("3-TIME-LIMIT", "r", encoding="utf-8").read().strip())
     print(color("Time limit:", "green"), color(str(timelimit) + "s", "blue"))
     print(color("Building checker", "green"))
     compile_cpp("testlib/checker.cpp", "tmp/checker")
@@ -420,7 +438,7 @@ def validate(fn=None):
     print()
 
     remains = list(filter(lambda x: x != std, os.listdir("solutions")))
-    time_limit = int(open("3-TIME-LIMIT", "r").read().strip())
+    time_limit = int(open("3-TIME-LIMIT", "r", encoding="utf-8").read().strip())
     for i, sol in enumerate(remains):
         compile_cpp(f"solutions/{sol}", "tmp/exec")
         print(
@@ -510,7 +528,7 @@ def validate(fn=None):
         )
     )
 
-    with open("validation-report.md", "w") as f:
+    with open("validation-report.md", "w", encoding="utf-8") as f:
         f.write("# validation report\n\n")
         from datetime import datetime as dt
 
@@ -521,7 +539,8 @@ def validate(fn=None):
                     [
                         fn,
                         str(timelimit) + "s",
-                        open("4-MEMORY-LIMIT", "r").read().strip() + " MiB",
+                        open("4-MEMORY-LIMIT", "r", encoding="utf-8").read().strip()
+                        + " MiB",
                         len(
                             list(
                                 filter(lambda x: not x.startswith("sample"), testcases)
@@ -554,14 +573,18 @@ def validate(fn=None):
 
 
 def validate_contest(fn):
-    with open(f"{fn}", "r") as stream:
+    with open(f"{fn}", "r", encoding="utf-8") as stream:
         data_dict = yaml.safe_load(stream)
     curdir = os.getcwd()
     print(
         color("Validating contest:", "green"), color(data_dict["title"], "blue") + "\n"
     )
 
-    with open(curdir + f"/{fn.replace('.yaml','')}-validation-report.md", "w") as f:
+    with open(
+        curdir + f"/{fn.replace('.yaml','')}-validation-report.md",
+        "w",
+        encoding="utf-8",
+    ) as f:
         f.write("# validation report\n\n")
         for i, pname in enumerate(data_dict["problems"]):
             os.chdir(curdir + "/" + pname)
@@ -569,7 +592,11 @@ def validate_contest(fn):
             validate()
             f.write(
                 f"## {pname}\n\n"
-                + open(curdir + "/" + pname + "/validation-report.md", "r")
+                + open(
+                    curdir + "/" + pname + "/validation-report.md",
+                    "r",
+                    encoding="utf-8",
+                )
                 .read()
                 .replace("# validation report\n\n", "")
                 + "\n\n"
@@ -602,14 +629,14 @@ def export_problem(fn=None):
 
     print(color("Compiling statement", "green"))
 
-    with open("statement.tex", "r") as f:
+    with open("statement.tex", "r", encoding="utf-8") as f:
         content = (
             f.read()
-            .replace("\\cnname", open("1-CN-NAME", "r").read())
+            .replace("\\cnname", open("1-CN-NAME", "r", encoding="utf-8").read())
             .replace("\\enname", fn)
         )
 
-    with open("statement-escape.tex", "w") as f:
+    with open("statement-escape.tex", "w", encoding="utf-8") as f:
         f.write(content)
 
     subprocess.run(
@@ -642,7 +669,7 @@ def export_problem(fn=None):
 
 
 def export_contest(fn):
-    with open(f"{fn}", "r") as stream:
+    with open(f"{fn}", "r", encoding="utf-8") as stream:
         data_dict = yaml.safe_load(stream)
 
     fn = fn.replace(".yaml", "")
@@ -715,10 +742,10 @@ def export_contest(fn):
 
     for pname in data_dict["problems"]:
         # copy checker
-        with open(f"{pname}/testlib/checker.cpp", "r") as f:
+        with open(f"{pname}/testlib/checker.cpp", "r", encoding="utf-8") as f:
             code = f.read()
         code = code.replace("registerTestlibCmd", "registerLemonChecker")
-        with open(f"tmp/checker/{pname}.cpp", "w") as f:
+        with open(f"tmp/checker/{pname}.cpp", "w", encoding="utf-8") as f:
             f.write(code)
 
         # problem metadata
@@ -740,9 +767,9 @@ def export_contest(fn):
             "testCases": [],
         }
 
-        with open(f"{pname}/4-MEMORY-LIMIT", "r") as f:
+        with open(f"{pname}/4-MEMORY-LIMIT", "r", encoding="utf-8") as f:
             memlimit = int(f.read().strip())
-        with open(f"{pname}/3-TIME-LIMIT", "r") as f:
+        with open(f"{pname}/3-TIME-LIMIT", "r", encoding="utf-8") as f:
             timelimit = int(f.read().strip())
 
         shutil.copytree(f"{pname}/solutions", f"tmp/source/std/{pname}")
@@ -785,17 +812,17 @@ def export_contest(fn):
         compile_cmd += f"g++ checker/{pname}.cpp -std=c++14 -O2 -o checker/{pname}\n"
         compile_cmd += f"mv checker/{pname}.exe data/{pname}/checker.exe\n"
 
-    with open("tmp/generate_checkers.bat", "w") as f:
+    with open("tmp/generate_checkers.bat", "w", encoding="utf-8") as f:
         f.write(compile_cmd)
-    with open("tmp/generate_checkers.sh", "w") as f:
+    with open("tmp/generate_checkers.sh", "w", encoding="utf-8") as f:
         f.write(compile_cmd.replace(".exe", ""))
 
     # create empty file
-    open("tmp/GENERATE CHECKERS FIRST", "w").close()
+    open("tmp/GENERATE CHECKERS FIRST", "w", encoding="utf-8").close()
 
     shutil.copy(f"{fn}.pdf", "tmp/statement.pdf")
 
-    with open(f"tmp/{fn}.cdf", "w") as f:
+    with open(f"tmp/{fn}.cdf", "w", encoding="utf-8") as f:
         import json
 
         f.write(json.dumps(meta))

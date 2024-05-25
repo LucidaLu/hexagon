@@ -3,8 +3,10 @@ from setuptools import setup
 import hexagon.__init__ as meta
 
 import os
+from os.path import expanduser
 
-os.system("cp -r ./.hexagon/ ~/")
+home = expanduser("~")
+os.system(f"cp -r ./.hexagon/ {home}/")
 
 setup(
     name="hexagon",
@@ -16,7 +18,7 @@ setup(
     author_email="luyiren12@gmail.com",
     license="MIT",
     packages=["hexagon"],
-    install_requires=["pandas", "psutil", "PyYAML", "tqdm","markdown"],
+    install_requires=["pandas", "psutil", "PyYAML", "tqdm", "markdown", "resource"],
     classifiers=[
         "Intended Audience :: Science/Research",
         "Programming Language :: Python :: 3",
