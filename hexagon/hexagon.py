@@ -7,6 +7,26 @@ from tqdm import tqdm
 import yaml
 import markdown
 
+latex_command = list(
+    open(Path.home() / ".hexagon/latex-command", "r").read().split(" ")
+)
+
+
+def latex_compile(fn):
+    subprocess.run(
+        latex_command + ["-shell-escape", fn],
+    )
+
+    print(
+        color("Compiling twice to ensure the best outcome", "green"), color(fn, "blue")
+    )
+
+    subprocess.run(
+        latex_command + ["-shell-escape", fn],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
 
 def color(text, color):
     codes = {
@@ -58,7 +78,7 @@ def build_contest(fn):
         data_dict = yaml.safe_load(stream)
 
     for pname in data_dict["problems"]:
-        generate_sample_output(pname)
+        generate_sample_output(pname, compile_tex=False)
         os.chdir("..")
 
     for pname in data_dict["problems"]:
@@ -135,7 +155,7 @@ def build_contest(fn):
 
     for p in data_dict["problems"]:
         s += "%% problem statement for %s\n" % (p)
-        cn_name = open(p + "/1-CN-NAME").read()
+        cn_name = open(p + "/1-CN-NAME", encoding="utf-8").read()
         full_name = f"{cn_name}（{p}）"
         PROBLEM_TEMPLATE = (
             r"""
@@ -174,6 +194,14 @@ def build_contest(fn):
     with open(f"{fn.replace('.yaml','')}.tex", "w", encoding="utf-8") as f:
         f.write(content)
 
+    shutil.copytree(
+        Path.home() / ".hexagon/template/.latex-class",
+        "./.latex-class",
+        dirs_exist_ok=True,
+    )
+
+    latex_compile(f"{fn.replace('.yaml','')}.tex")
+
 
 def get_std_solution():
     for f in os.listdir("solutions"):
@@ -182,7 +210,7 @@ def get_std_solution():
     assert 0
 
 
-def generate_sample_output(fn=None):
+def generate_sample_output(fn=None, compile_tex=True):
     if fn is not None:
         os.chdir(fn)
     else:
@@ -304,6 +332,9 @@ def generate_sample_output(fn=None):
     )
 
     shutil.rmtree("tmp")
+
+    if compile_tex:
+        latex_compile("statement.tex")
 
 
 def run_program(timeout, q):
@@ -639,16 +670,7 @@ def export_problem(fn=None):
     with open("statement-escape.tex", "w", encoding="utf-8") as f:
         f.write(content)
 
-    subprocess.run(
-        ["xelatex", "-shell-escape", "statement-escape.tex"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    subprocess.run(
-        ["xelatex", "-shell-escape", "statement-escape.tex"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    latex_compile("statement-escape.tex")
 
     print(color("Copying files", "green"))
 
@@ -682,16 +704,7 @@ def export_contest(fn):
 
     print(color("Compiling statement", "green"))
 
-    subprocess.run(
-        ["xelatex", "-shell-escape", f"{fn}.tex"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    subprocess.run(
-        ["xelatex", "-shell-escape", f"{fn}.tex"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
+    latex_compile(f"{fn}.tex")
 
     shutil.copy(f"{fn}.pdf", f"tmp/statement.pdf")
 

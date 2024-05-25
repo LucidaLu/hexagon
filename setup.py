@@ -18,7 +18,15 @@ setup(
     author_email="luyiren12@gmail.com",
     license="MIT",
     packages=["hexagon"],
-    install_requires=["pandas", "psutil", "PyYAML", "tqdm", "markdown", "resource"],
+    install_requires=[
+        "pandas",
+        "psutil",
+        "PyYAML",
+        "tqdm",
+        "markdown",
+        "resource",
+        "tabulate",
+    ],
     classifiers=[
         "Intended Audience :: Science/Research",
         "Programming Language :: Python :: 3",
